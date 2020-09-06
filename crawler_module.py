@@ -4,6 +4,9 @@ from urllib.request import urlparse, urljoin
 from bs4 import BeautifulSoup
 import colorama
 from gensim.summarization import keywords
+from nltk.corpus import stopwords 
+from nltk.tokenize import word_tokenize 
+from nltk.stem import PorterStemmer
 
 #All the links with the same domain name as th input URL will be stored
 #in internal_links set and others in external_links set
@@ -96,8 +99,25 @@ def crawler(url, depth=1):
       for external_link in external_links:
          print(external_link.strip(), file=f)
 
+
+#This method is used to find keywords after tokenizing, stemming the tokens, and using weighted frequency to calculate scores
+
+def keyword_gen(article):
+   stop_words = set(stopwords.words('english'))
+   word_tokens = word_tokenize(article)
+   ps = PorterStemmer() 
+   tokens = []
+   filter_string = "@!~`#$%^&*_-:;.,/?|"
+   for w in word_tokens:
+      if w not in stop_words and w not in filter_string:
+         tokens.append(ps.stem(w))
+   article_for_keywords = " ".join(tokens)
+   key_words = keywords(article_for_keywords, words=20, split=True, scores=False, pos_filter=('NN'), lemmatize=True, deacc=True)
+   return key_words
+
 #This method is used to fetch content from the set of internal links. Fetched all the text in paragraph tags, 
 # H1 and H2 header tags.
+
 def fetch_content():
    for url in internal_links:
       page = requests.get(url).text
@@ -105,6 +125,8 @@ def fetch_content():
       p_tags = soup.find_all('p')
       h1_tags = soup.find_all('h1')
       h2_tags = soup.find_all('h2')
+      h3_tags = soup.find_all('h3')
+      h4_tags = soup.find_all('h4')
       p_tags_text = [tag.get_text().strip() for tag in p_tags]
 
       #Performed text cleaning here
@@ -114,10 +136,16 @@ def fetch_content():
       for i in range(0, len(sentence_list)):
          article = article + sentence_list[i] + " "
 
-      #generated keywords here. 10 keywords each for a URL, with their scores and also performed lemmatization.
-      key_words = keywords(article, words=10, split=True, scores=True, pos_filter=('NN', 'JJ'), lemmatize=True, deacc=True)
+      
       h1_tags_text = [tag.get_text().strip().replace("\n", " ") for tag in h1_tags]
       h2_tags_text = [tag.get_text().strip().replace("\n", " ") for tag in h2_tags]
+      h3_tags_text = [tag.get_text().strip().replace("\n", " ") for tag in h3_tags]
+      h4_tags_text = [tag.get_text().strip().replace("\n", " ") for tag in h4_tags]
+
+      article_for_keywords = article + " ".join(h1_tags_text) + " ".join(h2_tags_text) + " ".join(h3_tags_text) + " ".join(h4_tags_text)
+
+      #generated keywords here. 10 keywords each for a URL, with their scores and also performed lemmatization.
+      key_words = keyword_gen(article_for_keywords)
 
       print(url.strip())
       print()
@@ -129,6 +157,12 @@ def fetch_content():
       print()
       print("H2 tags are - \n")
       print(h2_tags_text)
+      print()
+      print("H3 tags are - \n")
+      print(h3_tags_text)
+      print()
+      print("H4 tags are - \n")
+      print(h4_tags_text)
 
       print("\nThe keywords are - ")
       print(key_words)
@@ -146,9 +180,20 @@ def fetch_content():
          print(file=f)
          print("H2 tags are - \n", file=f)
          print(h2_tags_text, file=f)
+         print(file=f)
+         print("H3 tags are - \n", file=f)
+         print(h3_tags_text, file=f)
+         print(file=f)
+         print("H4 tags are - \n", file=f)
+         print(h4_tags_text, file=f)
          print("\nThe keywords are - \n", file=f)
          print(key_words, file=f)
          print("--------------------------------------------------\n", file=f)
+
+      joined_key_words = " ".join(key_words)
+      with open(f"data.txt", "a+") as f:
+         print(f"{url.strip()} , {joined_key_words}", file=f)
+
 
 
 
